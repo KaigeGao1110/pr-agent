@@ -39,6 +39,7 @@ class PRCodeSuggestions:
                  ai_handler: partial[BaseAiHandler,] = LiteLLMAIHandler):
 
         self.git_provider = get_git_provider_with_context(pr_url)
+        self.initial_pr_head_sha = self._get_pr_head_sha()
         self.main_language = get_main_pr_language(
             self.git_provider.get_languages(), self.git_provider.get_files()
         )
@@ -121,6 +122,10 @@ class PRCodeSuggestions:
             data = await retry_with_fallback_models(self.prepare_prediction_main, model_type=ModelType.REGULAR)
             if not data:
                 data = {"code_suggestions": []}
+            if self._pr_head_changed_since_start():
+                get_logger().info("Discarding code suggestions because the PR head changed during generation")
+                self._publish_stale_result_comment()
+                return
             self.data = data
 
             # Handle the case where the PR has no suggestions
@@ -223,6 +228,37 @@ class PRCodeSuggestions:
             "Attempts: 1"
             f"{run_url}"
         )
+
+    def _get_pr_head_sha(self) -> str | None:
+        try:
+            return getattr(getattr(self.git_provider.pr, "head", None), "sha", None)
+        except Exception:
+            return None
+
+    def _pr_head_changed_since_start(self) -> bool:
+        if not self.initial_pr_head_sha:
+            return False
+        refresh_pr = getattr(self.git_provider, "_get_pr", None)
+        if not callable(refresh_pr):
+            return False
+        try:
+            latest_pr = refresh_pr()
+            latest_head_sha = getattr(getattr(latest_pr, "head", None), "sha", None)
+            return bool(latest_head_sha and latest_head_sha != self.initial_pr_head_sha)
+        except Exception as e:
+            get_logger().warning(f"Unable to verify whether the PR head changed: {e}")
+            return False
+
+    def _publish_stale_result_comment(self):
+        body = (
+            "## PR Code Suggestions ✨\n\n"
+            "The requested review completed after the PR changed, so its stale results were discarded. "
+            "Run `/improve` again to review the latest head."
+        )
+        if self.progress_response:
+            self.git_provider.edit_comment(self.progress_response, body)
+        else:
+            self.git_provider.publish_comment(body)
 
     async def add_self_review_text(self, pr_body):
         text = get_settings().pr_code_suggestions.code_suggestions_self_review_text

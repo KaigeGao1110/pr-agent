@@ -43,6 +43,15 @@ def test_failure_comment_is_safe_and_links_to_the_action_run(monkeypatch):
     assert "secret-token" not in body
 
 
+def test_pr_head_change_is_detected_before_results_are_published():
+    provider = MagicMock()
+    provider._get_pr.return_value.head.sha = "new-sha"
+    tool = _make_tool(provider)
+    tool.initial_pr_head_sha = "old-sha"
+
+    assert tool._pr_head_changed_since_start() is True
+
+
 def test_prepare_pr_code_suggestions_filters_duplicates_and_missing_required_fields():
     tool = _make_tool()
     prediction = """
