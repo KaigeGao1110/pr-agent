@@ -1,0 +1,8 @@
+PR-Agent fork modifications
+Copyright 2026 Kaige Gao
+
+This repository is a fork of The-PR-Agent/pr-agent. It retains the upstream
+Apache License, Version 2.0. Kaige Gao modified the GitHub Action build,
+model retry behavior, fallback handling, result publishing, stale-result
+protection, configuration, and their focused tests for cost-controlled manual
+PR reviews.
