@@ -55,6 +55,19 @@ async def test_chat_completion_passes_seed_when_temperature_is_zero(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_chat_completion_disables_litellm_retries(monkeypatch):
+    monkeypatch.setattr(litellm_handler, "get_settings", FakeSettings)
+
+    with patch("pr_agent.algo.ai_handlers.litellm_ai_handler.acompletion", new_callable=AsyncMock) as mock_call:
+        mock_call.return_value = _mock_response()
+        handler = litellm_handler.LiteLLMAIHandler()
+
+        await handler.chat_completion(model="gpt-4o", system="sys", user="usr")
+
+    assert mock_call.call_args.kwargs["num_retries"] == 0
+
+
+@pytest.mark.asyncio
 async def test_chat_completion_rejects_seed_for_claude_opus_4_8_default_temperature(monkeypatch):
     class FakeAPIError(Exception):
         pass

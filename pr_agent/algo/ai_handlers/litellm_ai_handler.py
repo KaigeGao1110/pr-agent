@@ -23,7 +23,9 @@ from pr_agent.algo.utils import ReasoningEffort, get_version
 from pr_agent.config_loader import get_settings
 from pr_agent.log import get_logger
 
-MODEL_RETRIES = 2
+# This fork is used for manually requested, cost-sensitive reviews. A failed
+# request is surfaced to the caller instead of being submitted again.
+MODEL_RETRIES = 1
 DUMMY_LITELLM_API_KEY = "dummy_key"  # placeholder set when no OpenAI key is configured
 
 
@@ -524,6 +526,7 @@ class LiteLLMAIHandler(BaseAiHandler):
                         "deployment_id": deployment_id,
                         "messages": messages,
                         "timeout": get_settings().config.ai_timeout,
+                        "num_retries": 0,
                         "api_base": api_base,
                     }
 

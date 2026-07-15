@@ -29,6 +29,20 @@ def _valid_suggestion(**overrides):
     return suggestion
 
 
+def test_failure_comment_is_safe_and_links_to_the_action_run(monkeypatch):
+    tool = _make_tool()
+    monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.com")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "KaigeGao1110/inferway")
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+
+    body = tool._build_failure_comment(TimeoutError("provider response included secret-token"))
+
+    assert "timed out" in body
+    assert "Attempts: 1" in body
+    assert "https://github.com/KaigeGao1110/inferway/actions/runs/123" in body
+    assert "secret-token" not in body
+
+
 def test_prepare_pr_code_suggestions_filters_duplicates_and_missing_required_fields():
     tool = _make_tool()
     prediction = """

@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import difflib
+import os
 import re
 import textwrap
 import traceback
@@ -190,13 +191,38 @@ class PRCodeSuggestions:
                                artifact={"traceback": traceback.format_exc()})
             if get_settings().config.publish_output:
                 if self.progress_response:
-                    self.git_provider.remove_comment(self.progress_response)
+                    self.git_provider.edit_comment(self.progress_response, self._build_failure_comment(e))
                 else:
                     try:
                         self.git_provider.remove_initial_comment()
-                        self.git_provider.publish_comment(f"Failed to generate code suggestions for PR")
+                        self.git_provider.publish_comment(self._build_failure_comment(e))
                     except Exception as e:
                         get_logger().exception(f"Failed to update persistent review, error: {e}")
+            raise
+
+    @staticmethod
+    def _build_failure_comment(error: Exception) -> str:
+        error_text = str(error).lower()
+        if isinstance(error, TimeoutError) or "timeout" in error_text or "timed out" in error_text:
+            category = "timed out"
+        elif "rate limit" in error_text:
+            category = "rate limited"
+        else:
+            category = "failed"
+
+        run_url = ""
+        server_url = os.getenv("GITHUB_SERVER_URL")
+        repository = os.getenv("GITHUB_REPOSITORY")
+        run_id = os.getenv("GITHUB_RUN_ID")
+        if server_url and repository and run_id:
+            run_url = f"\n\n[View workflow run]({server_url}/{repository}/actions/runs/{run_id})"
+
+        return (
+            "## PR Code Suggestions ✨\n\n"
+            f"The requested review {category}. No automatic retry or fallback model was used.\n\n"
+            "Attempts: 1"
+            f"{run_url}"
+        )
 
     async def add_self_review_text(self, pr_body):
         text = get_settings().pr_code_suggestions.code_suggestions_self_review_text

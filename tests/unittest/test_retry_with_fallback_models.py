@@ -12,6 +12,7 @@ _TRACKED_KEYS = (
     "config.model_weak",
     "config.model_reasoning",
     "config.fallback_models",
+    "config.disable_fallback_models",
     "openai.deployment_id",
     "openai.fallback_deployments",
 )
@@ -67,6 +68,29 @@ def test_primary_fails_fallback_succeeds():
 
         assert result == "ok:fallback-1"
         assert calls == ["primary-model", "fallback-1"]
+    finally:
+        _restore_settings(snapshot)
+
+
+def test_disable_fallback_models_stops_after_the_primary_failure():
+    snapshot = _snapshot_settings()
+    try:
+        get_settings().set("config.model", "primary-model")
+        get_settings().set("config.fallback_models", ["fallback-1"])
+        get_settings().set("config.disable_fallback_models", True)
+        get_settings().set("openai.deployment_id", None)
+        get_settings().set("openai.fallback_deployments", [])
+
+        calls = []
+
+        async def fake_f(model):
+            calls.append(model)
+            raise RuntimeError("primary failed")
+
+        with pytest.raises(Exception, match="Failed to generate prediction"):
+            asyncio.run(retry_with_fallback_models(fake_f))
+
+        assert calls == ["primary-model"]
     finally:
         _restore_settings(snapshot)
 

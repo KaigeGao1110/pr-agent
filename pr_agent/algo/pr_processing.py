@@ -347,6 +347,8 @@ def _get_all_models(model_type: ModelType = ModelType.REGULAR) -> List[str]:
         model = get_settings().config.model
     else:
         model = get_settings().config.model
+    if get_settings().config.get("disable_fallback_models", False):
+        return [model]
     fallback_models = get_settings().config.fallback_models
     if not isinstance(fallback_models, list):
         fallback_models = [m.strip() for m in fallback_models.split(",")]
